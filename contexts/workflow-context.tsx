@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { apiClient } from "@/lib/api-client";
 
 export type PhaseLocks = {
   phase1: boolean;
@@ -22,7 +23,7 @@ type WorkflowContextValue = {
   setLocks: (next: PhaseLocks) => void;
   lockPhase: (phase: 1 | 2 | 3) => void;
   canAccessPhase: (phase: 1 | 2 | 3 | 4) => boolean;
-  /** Sidebar: completed | current | locked | idle (접근 가능, 아직 안 함) */
+  /** Sidebar: completed | current | locked | idle */
   getPhaseStatus: (
     phase: 1 | 2 | 3 | 4,
     currentPhase: number,
@@ -31,16 +32,16 @@ type WorkflowContextValue = {
 
 const WorkflowContext = createContext<WorkflowContextValue | null>(null);
 
-function storageKey(projectId: string) {
+function lsKey(projectId: string) {
   return `factory-pipe-workflow-${projectId}`;
 }
 
-function loadLocks(projectId: string): PhaseLocks {
+function loadLocksFromStorage(projectId: string): PhaseLocks {
   if (typeof window === "undefined") {
     return { phase1: false, phase2: false, phase3: false };
   }
   try {
-    const raw = localStorage.getItem(storageKey(projectId));
+    const raw = localStorage.getItem(lsKey(projectId));
     if (!raw) return { phase1: false, phase2: false, phase3: false };
     const p = JSON.parse(raw) as Partial<PhaseLocks>;
     return {
@@ -53,6 +54,33 @@ function loadLocks(projectId: string): PhaseLocks {
   }
 }
 
+function saveLocksToStorage(projectId: string, locks: PhaseLocks) {
+  try {
+    localStorage.setItem(lsKey(projectId), JSON.stringify(locks));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Derive PhaseLocks from the status of the three spec documents. */
+function deriveLocks(documents: { doc_type: string; status: string }[]): PhaseLocks {
+  const isFinal = (type: string) =>
+    documents.find((d) => d.doc_type === type)?.status === "Final";
+
+  // Phase 1 locked = requirements saved (we check for 00_overview or just use requirements endpoint result)
+  // For now: phase2 lock comes from all 3 spec docs being Final.
+  const specsFinal =
+    isFinal("01_db_schema") &&
+    isFinal("02_api_routes") &&
+    isFinal("03_frontend_ui");
+
+  return {
+    phase1: specsFinal ? true : false,
+    phase2: specsFinal,
+    phase3: false,
+  };
+}
+
 export function WorkflowProvider({
   projectId,
   children,
@@ -61,21 +89,43 @@ export function WorkflowProvider({
   children: ReactNode;
 }) {
   const [locks, setLocksState] = useState<PhaseLocks>(() =>
-    loadLocks(projectId),
+    loadLocksFromStorage(projectId),
   );
 
+  // Re-hydrate from localStorage when projectId changes
   useEffect(() => {
-    setLocksState(loadLocks(projectId));
+    setLocksState(loadLocksFromStorage(projectId));
   }, [projectId]);
 
-  const setLocks = useCallback((next: PhaseLocks) => {
-    setLocksState(next);
-    try {
-      localStorage.setItem(storageKey(projectId), JSON.stringify(next));
-    } catch {
-      /* ignore */
-    }
+  // Sync with API: load document statuses and update locks
+  useEffect(() => {
+    let cancelled = false;
+    apiClient.getDocuments(projectId).then((docs) => {
+      if (cancelled) return;
+      const apiLocks = deriveLocks(docs);
+      // Merge: keep any local locks that are already true (ratchet-only forward)
+      setLocksState((prev) => {
+        const merged: PhaseLocks = {
+          phase1: prev.phase1 || apiLocks.phase1,
+          phase2: prev.phase2 || apiLocks.phase2,
+          phase3: prev.phase3 || apiLocks.phase3,
+        };
+        saveLocksToStorage(projectId, merged);
+        return merged;
+      });
+    }).catch(() => {
+      // API not reachable — fall back to localStorage state silently
+    });
+    return () => { cancelled = true; };
   }, [projectId]);
+
+  const setLocks = useCallback(
+    (next: PhaseLocks) => {
+      setLocksState(next);
+      saveLocksToStorage(projectId, next);
+    },
+    [projectId],
+  );
 
   const lockPhase = useCallback(
     (phase: 1 | 2 | 3) => {
@@ -86,11 +136,7 @@ export function WorkflowProvider({
           ...(phase === 2 ? { phase2: true } : {}),
           ...(phase === 3 ? { phase3: true } : {}),
         };
-        try {
-          localStorage.setItem(storageKey(projectId), JSON.stringify(next));
-        } catch {
-          /* ignore */
-        }
+        saveLocksToStorage(projectId, next);
         return next;
       });
     },

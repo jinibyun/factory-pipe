@@ -4,48 +4,10 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { PhaseAccessGuard } from "@/components/phase-access-guard";
 import { useWorkflow } from "@/contexts/workflow-context";
-import { DEFAULT_SPECS } from "@/lib/spec-defaults";
+import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 type Target = "cursor" | "v0";
-
-const SPEC_KEY = (id: string, name: "db" | "api" | "ui") =>
-  `factory-pipe-spec-${id}-${name}`;
-
-function loadFinalSpecs(projectId: string) {
-  try {
-    return {
-      db:
-        localStorage.getItem(SPEC_KEY(projectId, "db")) ?? DEFAULT_SPECS.db,
-      api:
-        localStorage.getItem(SPEC_KEY(projectId, "api")) ?? DEFAULT_SPECS.api,
-      ui:
-        localStorage.getItem(SPEC_KEY(projectId, "ui")) ?? DEFAULT_SPECS.ui,
-    };
-  } catch {
-    return { ...DEFAULT_SPECS };
-  }
-}
-
-function assemblePrompt(target: Target, specs: ReturnType<typeof loadFinalSpecs>) {
-  const header =
-    target === "cursor"
-      ? "# Cursor — 구현 프롬프트 (Final 명세 기반)\n\n다음 명세를 준수해 코드를 작성하세요.\n"
-      : "# v0 — UI 프롬프트 (Final 명세 기반)\n\n다음 명세를 반영한 화면을 생성하세요.\n";
-
-  return [
-    header,
-    "\n## 01 DB\n",
-    specs.db,
-    "\n\n## 02 API\n",
-    specs.api,
-    "\n\n## 03 UI\n",
-    specs.ui,
-    target === "cursor"
-      ? "\n\n---\n스택: Next.js App Router, TypeScript, Tailwind. API는 Route Handlers.\n"
-      : "\n\n---\n스택: Next.js, Tailwind, shadcn/ui 스타일.\n",
-  ].join("");
-}
 
 export default function Phase3Page() {
   const params = useParams();
@@ -54,14 +16,28 @@ export default function Phase3Page() {
   const [target, setTarget] = useState<Target>("cursor");
   const [text, setText] = useState("");
   const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(() => {
-    setText(assemblePrompt(target, loadFinalSpecs(projectId)));
-  }, [target, projectId]);
+  const assemble = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiClient.assemblePrompt({
+        project_id: projectId,
+        target_phase: target === "cursor" ? "step3_ui_generation_cursor" : "step3_ui_generation_v0",
+      });
+      setText(res.assembled_prompt);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "프롬프트 생성 실패");
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, target]);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    assemble();
+  }, [assemble]);
 
   const copy = async () => {
     try {
@@ -126,18 +102,27 @@ export default function Phase3Page() {
               <button
                 type="button"
                 onClick={copy}
-                className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent/30"
+                disabled={loading || !text}
+                className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent/30 disabled:opacity-50"
               >
                 {copied ? "복사됨" : "Copy to Clipboard"}
               </button>
             </div>
 
-            <textarea
-              readOnly
-              value={text}
-              rows={24}
-              className="min-h-[420px] w-full flex-1 resize-y rounded-lg border border-input bg-muted/30 px-4 py-3 font-mono text-xs text-foreground"
-            />
+            {error ? (
+              <p className="text-sm text-destructive">{error}</p>
+            ) : null}
+
+            {loading ? (
+              <p className="text-sm text-muted-foreground">프롬프트 조립 중…</p>
+            ) : (
+              <textarea
+                readOnly
+                value={text}
+                rows={24}
+                className="min-h-[420px] w-full flex-1 resize-y rounded-lg border border-input bg-muted/30 px-4 py-3 font-mono text-xs text-foreground"
+              />
+            )}
           </div>
         </div>
       )}

@@ -4,51 +4,57 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { FolderKanban, Plus, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  addProject,
-  loadProjects,
-  type Project,
-} from "@/lib/projects";
+import { apiClient } from "@/lib/api-client";
+import type { ProjectRow } from "@/types";
 
 export default function HomePage() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [mounted, setMounted] = useState(false);
+  const [projects, setProjects] = useState<ProjectRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [overviewDraft, setOverviewDraft] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(() => {
-    setProjects(loadProjects());
+  const refresh = useCallback(async () => {
+    try {
+      const data = await apiClient.getProjects();
+      setProjects(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "프로젝트 목록을 불러오지 못했습니다.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    setMounted(true);
     refresh();
   }, [refresh]);
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    const id =
-      typeof crypto !== "undefined" && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `p-${Date.now()}`;
-    addProject({
-      id,
-      name: name.trim(),
-      description: description.trim(),
-      overviewDraft: overviewDraft.trim(),
-    });
-    setName("");
-    setDescription("");
-    setOverviewDraft("");
-    setModalOpen(false);
-    refresh();
-    window.location.href = `/project/${id}/phase/1`;
+    setCreating(true);
+    setError(null);
+    try {
+      const project = await apiClient.createProject({
+        name: name.trim(),
+        description: description.trim() || undefined,
+        overview_draft: overviewDraft.trim() || undefined,
+      });
+      setName("");
+      setDescription("");
+      setOverviewDraft("");
+      setModalOpen(false);
+      window.location.href = `/project/${project.id}/phase/1`;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "프로젝트 생성에 실패했습니다.");
+      setCreating(false);
+    }
   };
 
-  if (!mounted) {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <p className="text-sm text-muted-foreground">불러오는 중…</p>
@@ -110,6 +116,10 @@ export default function HomePage() {
           </div>
         </div>
 
+        {error ? (
+          <p className="mt-4 text-sm text-destructive">{error}</p>
+        ) : null}
+
         <div className="mt-10">
           {projects.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 bg-card/40 px-6 py-20 text-center backdrop-blur-sm">
@@ -152,7 +162,7 @@ export default function HomePage() {
                       </p>
                     )}
                     <p className="mt-4 text-xs text-muted-foreground">
-                      {new Date(p.createdAt).toLocaleString("ko-KR")}
+                      {new Date(p.created_at).toLocaleString("ko-KR")}
                     </p>
                   </Link>
                 </li>
@@ -183,6 +193,9 @@ export default function HomePage() {
             <p className="mt-1 text-sm text-muted-foreground">
               이름과 개요를 넣으면 워크플로가 시작됩니다.
             </p>
+            {error ? (
+              <p className="mt-3 text-sm text-destructive">{error}</p>
+            ) : null}
             <form className="mt-6 space-y-4" onSubmit={handleCreate}>
               <div>
                 <label className="text-xs font-medium text-muted-foreground">
@@ -232,9 +245,10 @@ export default function HomePage() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:bg-foreground/90"
+                  disabled={creating}
+                  className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:bg-foreground/90 disabled:opacity-50"
                 >
-                  생성
+                  {creating ? "생성 중…" : "생성"}
                 </button>
               </div>
             </form>

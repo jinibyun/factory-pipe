@@ -1,10 +1,12 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { PhaseAccessGuard } from "@/components/phase-access-guard";
 import { useWorkflow } from "@/contexts/workflow-context";
+import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import type { MigrationLogRow } from "@/types";
 
 const DEFAULT_SQL = `-- Supabase / Postgres (예시)
 -- create table if not exists migration_logs (
@@ -19,28 +21,40 @@ export default function Phase4Page() {
   const projectId = params.id as string;
   const { canAccessPhase } = useWorkflow();
   const [sql, setSql] = useState(DEFAULT_SQL);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [logs, setLogs] = useState<MigrationLogRow[]>([]);
+  const [executing, setExecuting] = useState(false);
 
-  const appendLog = useCallback((line: string) => {
-    setLogs((prev) => [
-      ...prev,
-      `[${new Date().toLocaleTimeString("ko-KR")}] ${line}`,
-    ]);
-  }, []);
+  const loadLogs = useCallback(async () => {
+    try {
+      const data = await apiClient.getMigrationLogs(projectId);
+      setLogs(data);
+    } catch {
+      /* ignore */
+    }
+  }, [projectId]);
 
-  const execute = () => {
-    appendLog("migration_logs: Execute & Sync 요청 (데모)");
-    const trimmed = sql.trim();
-    if (!trimmed) {
-      appendLog("실패: 빈 쿼리");
-      return;
+  useEffect(() => {
+    loadLogs();
+  }, [loadLogs]);
+
+  const execute = async () => {
+    if (!sql.trim()) return;
+    setExecuting(true);
+    try {
+      await apiClient.migrate({ project_id: projectId, sql_query: sql });
+      await loadLogs();
+    } catch {
+      await loadLogs();
+    } finally {
+      setExecuting(false);
     }
-    if (trimmed.toLowerCase().startsWith("select")) {
-      appendLog("성공: 읽기 쿼리 시뮬레이션 완료");
-      appendLog("스키마 파일 동기화 플래그 설정됨 (로컬 데모)");
-    } else {
-      appendLog("성공: DDL 적용 시뮬레이션 (실제 DB 미연결)");
-    }
+  };
+
+  const formatLog = (log: MigrationLogRow) => {
+    const ts = new Date(log.applied_at).toLocaleTimeString("ko-KR");
+    const statusLabel = log.status === "success" ? "성공" : "실패";
+    const snippet = log.sql_query.slice(0, 60).replace(/\n/g, " ");
+    return `[${ts}] ${statusLabel}: ${snippet}${log.sql_query.length > 60 ? "…" : ""}`;
   };
 
   return (
@@ -60,7 +74,7 @@ export default function Phase4Page() {
               마이그레이션 모니터
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              SQL 실행·로그 확인 (실제 Supabase 연결 전 데모 UI)
+              SQL 실행·로그 확인 (Mock API — 실제 Supabase 연결 전 단계)
             </p>
           </header>
 
@@ -75,12 +89,13 @@ export default function Phase4Page() {
             <button
               type="button"
               onClick={execute}
+              disabled={executing}
               className={cn(
                 "w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground",
-                "hover:bg-primary/90",
+                "hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50",
               )}
             >
-              Execute & Sync
+              {executing ? "실행 중…" : "Execute & Sync"}
             </button>
 
             <div className="flex flex-1 flex-col rounded-lg border border-border bg-muted/20">
@@ -90,7 +105,7 @@ export default function Phase4Page() {
               <pre className="max-h-[280px] flex-1 overflow-auto p-3 font-mono text-xs text-foreground">
                 {logs.length === 0
                   ? "로그가 여기에 표시됩니다."
-                  : logs.join("\n")}
+                  : logs.map(formatLog).join("\n")}
               </pre>
             </div>
           </div>
