@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { lockDocument } from "@/lib/mock-store";
 import type { LockDocumentRequest, LockDocumentResponse } from "@/types";
 
-// TODO: Supabase Auth 검증 + Workflow Locking 규칙 검증
+// TODO: supabase or Neon Auth 검증 + Workflow Locking 규칙 검증
 async function delay() {
   await new Promise((r) => setTimeout(r, 300));
 }

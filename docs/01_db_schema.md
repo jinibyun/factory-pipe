@@ -1,14 +1,14 @@
 ## 1. 개요
 
-- **Database**: Supabase (PostgreSQL) [6]
-- **인증**: Supabase Auth 연동 (`auth.users`) [6, 11]
+- **Database**: supabase or Neon (PostgreSQL) [6]
+- **인증**: supabase or Neon Auth 연동 (`auth.users`) [6, 11]
 - **원칙**: 모든 테이블은 RLS(Row Level Security)를 활성화하여 데이터 접근을 철저히 통제함 [26].
 
 ## 2. 테이블 설계 (Tables & Relationships)
 
 ### 2.1 `users` (사용자 프로필)
 
-Supabase `auth.users` 생성 시 트리거를 통해 자동 생성되는 확장 프로필 테이블.
+supabase or Neon `auth.users` 생성 시 트리거를 통해 자동 생성되는 확장 프로필 테이블.
 
 - `id` (uuid, PK) - `auth.users.id` 참조 (Cascade)
 - `email` (text, unique)

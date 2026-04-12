@@ -1,7 +1,7 @@
 ## 1. 개요
 
 - **Framework:** Next.js App Router (`app/api/...`)
-- **인증 인가:** 모든 API는 Supabase Auth Token (Bearer) 검증 필수. (미인증 시 `401 Unauthorized`)
+- **인증 인가:** 모든 API는 supabase or Neon Auth Token (Bearer) 검증 필수. (미인증 시 `401 Unauthorized`)
 - **핵심 원칙:** 마크다운 파일 조작은 반드시 GitHub API를 거쳐 레포지토리에 직접 커밋함 (진실의 원천 유지).
 
 ## 2. API 엔드포인트 상세
@@ -81,11 +81,11 @@
     }`
     
 
-### 2.4 DB 마이그레이션 모니터 (Supabase 제어)
+### 2.4 DB 마이그레이션 모니터 (supabase or Neon 제어)
 
 **`POST /api/database/migrate`**
 
-- **기능:** UI에서 입력한 SQL 쿼리를 Supabase에 직접 실행하고 `migration_logs`에 기록.
+- **기능:** UI에서 입력한 SQL 쿼리를 supabase or Neon에 직접 실행하고 `migration_logs`에 기록.
 - **Request:**JSON
     
     `{

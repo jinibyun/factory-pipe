@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { upsertDocument } from "@/lib/mock-store";
 import type { SyncDocumentRequest, SyncDocumentResponse } from "@/types";
 
-// TODO: Supabase Auth 검증 + 실제 GitHub API 연동
+// TODO: supabase or Neon Auth 검증 + 실제 GitHub API 연동
 async function delay() {
   await new Promise((r) => setTimeout(r, 600));
 }

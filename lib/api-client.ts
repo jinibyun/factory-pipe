@@ -36,7 +36,7 @@ async function request<T>(
   path: string,
   options?: RequestInit,
 ): Promise<T> {
-  // TODO: inject Authorization: Bearer {supabase_token} here
+  // TODO: inject Authorization: Bearer {supabase or Neon_token} here
   const res = await fetch(path, {
     headers: { "Content-Type": "application/json", ...options?.headers },
     ...options,

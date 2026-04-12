@@ -2,7 +2,7 @@ export const DEFAULT_SPECS = {
   db: `# 01 DB Schema (draft)
 
 ## 개요
-Supabase(Postgres) 기준 스키마 초안입니다.
+supabase or Neon(Postgres) 기준 스키마 초안입니다.
 
 ## 테이블 예시
 | 테이블 | 설명 |

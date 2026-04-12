@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { JudgeRequest, JudgeResponse } from "@/types";
 
-// TODO: Supabase Auth 검증 + GPT-4o-mini API 연동
+// TODO: supabase or Neon Auth 검증 + GPT-4o-mini API 연동
 async function delay() {
   await new Promise((r) => setTimeout(r, 500));
 }

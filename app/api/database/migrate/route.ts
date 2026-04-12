@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { addMigrationLog } from "@/lib/mock-store";
 import type { MigrateRequest, MigrateResponse } from "@/types";
 
-// TODO: Supabase Auth 검증 + 실제 Supabase SQL 실행
+// TODO: supabase or Neon Auth 검증 + 실제 supabase or Neon SQL 실행
 async function delay() {
   await new Promise((r) => setTimeout(r, 700));
 }

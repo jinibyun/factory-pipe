@@ -8,7 +8,7 @@ import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import type { MigrationLogRow } from "@/types";
 
-const DEFAULT_SQL = `-- Supabase / Postgres (예시)
+const DEFAULT_SQL = `-- supabase or Neon / Postgres (예시)
 -- create table if not exists migration_logs (
 --   id uuid primary key default gen_random_uuid(),
 --   message text,
@@ -74,7 +74,7 @@ export default function Phase4Page() {
               마이그레이션 모니터
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              SQL 실행·로그 확인 (Mock API — 실제 Supabase 연결 전 단계)
+              SQL 실행·로그 확인 (Mock API — 실제 supabase or Neon 연결 전 단계)
             </p>
           </header>
 

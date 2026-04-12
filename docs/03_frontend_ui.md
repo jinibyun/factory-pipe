@@ -50,7 +50,7 @@
 
 ### 3.4 Phase 4: 마이그레이션 모니터 (`app/project/[id]/phase/4/page.js`)
 
-- **기능:** UI에서 Supabase SQL 실행 및 스키마 파일 강제 동기화.
+- **기능:** UI에서 supabase or Neon SQL 실행 및 스키마 파일 강제 동기화.
 - **UI 요소:**
     - **SQL 에디터:** 쿼리 입력 코드 블록.
     - **실행 버튼:** `[Execute & Sync]`

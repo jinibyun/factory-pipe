@@ -3,7 +3,7 @@ import { getDocuments } from "@/lib/mock-store";
 import { DEFAULT_SPECS } from "@/lib/spec-defaults";
 import type { SpecSplitterRequest, SpecSplitterResponse } from "@/types";
 
-// TODO: Supabase Auth 검증 + Claude 3.5 Sonnet API 연동
+// TODO: supabase or Neon Auth 검증 + Claude 3.5 Sonnet API 연동
 async function delay() {
   await new Promise((r) => setTimeout(r, 800));
 }

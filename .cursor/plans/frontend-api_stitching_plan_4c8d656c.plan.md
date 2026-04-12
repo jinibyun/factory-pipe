@@ -178,9 +178,9 @@ export interface MigrateResponse { status: 'success' | 'failed'; log_id?: string
 
 ### 원칙
 
-- 모든 라우트는 실제 Supabase/GitHub 연동 없이 **인메모리 Map 또는 고정 fixture**로 응답
+- 모든 라우트는 실제 supabase or Neon/GitHub 연동 없이 **인메모리 Map 또는 고정 fixture**로 응답
 - 응답 구조는 `types/index.ts`의 타입과 정확히 일치 (나중에 실제 구현으로 swap 용이)
-- `Authorization` 헤더 검사 로직은 `// TODO: Supabase Auth 검증` 주석으로 자리 보전
+- `Authorization` 헤더 검사 로직은 `// TODO: supabase or Neon Auth 검증` 주석으로 자리 보전
 - 딜레이(`await new Promise(r => setTimeout(r, 300))`) 삽입으로 실제 네트워크 UX 시뮬레이션
 
 ### Mock 저장소 전략
