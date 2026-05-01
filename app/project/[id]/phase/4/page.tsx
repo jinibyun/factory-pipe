@@ -19,7 +19,7 @@ select 1 as ready;`;
 export default function Phase4Page() {
   const params = useParams();
   const projectId = params.id as string;
-  const { canAccessPhase } = useWorkflow();
+  const { canAccessPhase, locks, lockPhase } = useWorkflow();
   const [sql, setSql] = useState(DEFAULT_SQL);
   const [logs, setLogs] = useState<MigrationLogRow[]>([]);
   const [executing, setExecuting] = useState(false);
@@ -86,17 +86,38 @@ export default function Phase4Page() {
               className="w-full resize-y rounded-lg border border-input bg-background px-4 py-3 font-mono text-sm text-foreground outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
               spellCheck={false}
             />
-            <button
-              type="button"
-              onClick={execute}
-              disabled={executing}
-              className={cn(
-                "w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground",
-                "hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50",
-              )}
-            >
-              {executing ? "실행 중…" : "Execute & Sync"}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={execute}
+                disabled={executing}
+                className={cn(
+                  "rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground",
+                  "hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50",
+                )}
+              >
+                {executing ? "실행 중…" : "Execute & Sync"}
+              </button>
+              <button
+                type="button"
+                disabled={locks.phase4}
+                onClick={() => {
+                  if (
+                    confirm(
+                      "마이그레이션을 완료로 표시합니다. 전체 워크플로우가 완성됩니다. 계속할까요?",
+                    )
+                  ) {
+                    lockPhase(4);
+                  }
+                }}
+                className={cn(
+                  "rounded-md border border-primary px-4 py-2 text-sm font-medium text-primary",
+                  "hover:bg-primary/10 disabled:pointer-events-none disabled:opacity-40",
+                )}
+              >
+                {locks.phase4 ? "마이그레이션 완료 ✓" : "마이그레이션 완료로 표시"}
+              </button>
+            </div>
 
             <div className="flex flex-1 flex-col rounded-lg border border-border bg-muted/20">
               <div className="border-b border-border px-3 py-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">

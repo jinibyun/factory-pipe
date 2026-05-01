@@ -12,7 +12,7 @@ type Target = "cursor" | "v0";
 export default function Phase3Page() {
   const params = useParams();
   const projectId = params.id as string;
-  const { canAccessPhase } = useWorkflow();
+  const { canAccessPhase, locks, lockPhase } = useWorkflow();
   const [target, setTarget] = useState<Target>("cursor");
   const [text, setText] = useState("");
   const [copied, setCopied] = useState(false);
@@ -106,6 +106,25 @@ export default function Phase3Page() {
                 className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent/30 disabled:opacity-50"
               >
                 {copied ? "복사됨" : "Copy to Clipboard"}
+              </button>
+              <button
+                type="button"
+                disabled={locks.phase3}
+                onClick={() => {
+                  if (
+                    confirm(
+                      "프롬프트를 복사하고 외부 도구에 적용했나요? Phase 4(Migration)를 잠금 해제합니다.",
+                    )
+                  ) {
+                    lockPhase(3);
+                  }
+                }}
+                className={cn(
+                  "rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground",
+                  "hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-40",
+                )}
+              >
+                {locks.phase3 ? "Phase 4 잠금 해제됨 ✓" : "완료 → Phase 4 잠금 해제"}
               </button>
             </div>
 

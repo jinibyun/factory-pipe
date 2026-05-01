@@ -1,17 +1,38 @@
 import { NextResponse } from "next/server";
-import { getDocuments } from "@/lib/mock-store";
+import { db } from "@/lib/db";
+import { documents } from "@/lib/schema";
+import { eq } from "drizzle-orm";
+import type { DocumentRow, DocType, DocStatus } from "@/types";
 
-// TODO: supabase or Neon Auth 검증
-async function delay() {
-  await new Promise((r) => setTimeout(r, 200));
+function toIso(v: Date | string): string {
+  return v instanceof Date ? v.toISOString() : String(v);
+}
+
+function toDocumentRow(d: typeof documents.$inferSelect): DocumentRow {
+  return {
+    id: d.id,
+    project_id: d.projectId,
+    doc_type: d.docType as DocType,
+    content: d.content,
+    status: d.status as DocStatus,
+    version: d.version,
+    updated_at: toIso(d.updatedAt),
+  };
 }
 
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  await delay();
-  const { id } = await params;
-  const docs = getDocuments(id);
-  return NextResponse.json(docs);
+  try {
+    const { id } = await params;
+    const rows = await db
+      .select()
+      .from(documents)
+      .where(eq(documents.projectId, id));
+    return NextResponse.json(rows.map(toDocumentRow));
+  } catch (err) {
+    console.error("[GET /api/projects/[id]/documents]", err);
+    return NextResponse.json({ error: "Failed to fetch documents" }, { status: 500 });
+  }
 }

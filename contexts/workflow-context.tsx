@@ -15,13 +15,14 @@ export type PhaseLocks = {
   phase1: boolean;
   phase2: boolean;
   phase3: boolean;
+  phase4: boolean;
 };
 
 type WorkflowContextValue = {
   projectId: string;
   locks: PhaseLocks;
   setLocks: (next: PhaseLocks) => void;
-  lockPhase: (phase: 1 | 2 | 3) => void;
+  lockPhase: (phase: 1 | 2 | 3 | 4) => void;
   canAccessPhase: (phase: 1 | 2 | 3 | 4) => boolean;
   /** Sidebar: completed | current | locked | idle */
   getPhaseStatus: (
@@ -38,19 +39,20 @@ function lsKey(projectId: string) {
 
 function loadLocksFromStorage(projectId: string): PhaseLocks {
   if (typeof window === "undefined") {
-    return { phase1: false, phase2: false, phase3: false };
+    return { phase1: false, phase2: false, phase3: false, phase4: false };
   }
   try {
     const raw = localStorage.getItem(lsKey(projectId));
-    if (!raw) return { phase1: false, phase2: false, phase3: false };
+    if (!raw) return { phase1: false, phase2: false, phase3: false, phase4: false };
     const p = JSON.parse(raw) as Partial<PhaseLocks>;
     return {
       phase1: Boolean(p.phase1),
       phase2: Boolean(p.phase2),
       phase3: Boolean(p.phase3),
+      phase4: Boolean(p.phase4),
     };
   } catch {
-    return { phase1: false, phase2: false, phase3: false };
+    return { phase1: false, phase2: false, phase3: false, phase4: false };
   }
 }
 
@@ -78,6 +80,7 @@ function deriveLocks(documents: { doc_type: string; status: string }[]): PhaseLo
     phase1: specsFinal ? true : false,
     phase2: specsFinal,
     phase3: false,
+    phase4: false,
   };
 }
 
@@ -88,11 +91,16 @@ export function WorkflowProvider({
   projectId: string;
   children: ReactNode;
 }) {
-  const [locks, setLocksState] = useState<PhaseLocks>(() =>
-    loadLocksFromStorage(projectId),
-  );
+  // Start with all-false to match server-rendered HTML, then hydrate
+  // from localStorage in useEffect (avoids SSR/client mismatch)
+  const [locks, setLocksState] = useState<PhaseLocks>({
+    phase1: false,
+    phase2: false,
+    phase3: false,
+    phase4: false,
+  });
 
-  // Re-hydrate from localStorage when projectId changes
+  // Hydrate from localStorage after mount, and whenever projectId changes
   useEffect(() => {
     setLocksState(loadLocksFromStorage(projectId));
   }, [projectId]);
@@ -109,6 +117,7 @@ export function WorkflowProvider({
           phase1: prev.phase1 || apiLocks.phase1,
           phase2: prev.phase2 || apiLocks.phase2,
           phase3: prev.phase3 || apiLocks.phase3,
+          phase4: prev.phase4 || apiLocks.phase4,
         };
         saveLocksToStorage(projectId, merged);
         return merged;
@@ -128,13 +137,14 @@ export function WorkflowProvider({
   );
 
   const lockPhase = useCallback(
-    (phase: 1 | 2 | 3) => {
+    (phase: 1 | 2 | 3 | 4) => {
       setLocksState((prev) => {
         const next: PhaseLocks = {
           ...prev,
           ...(phase === 1 ? { phase1: true } : {}),
           ...(phase === 2 ? { phase2: true } : {}),
           ...(phase === 3 ? { phase3: true } : {}),
+          ...(phase === 4 ? { phase4: true } : {}),
         };
         saveLocksToStorage(projectId, next);
         return next;
@@ -166,7 +176,7 @@ export function WorkflowProvider({
             ? locks.phase2
             : phase === 3
               ? locks.phase3
-              : false;
+              : locks.phase4;
       if (done) return "completed";
       return "idle";
     },
