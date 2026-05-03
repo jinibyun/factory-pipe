@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { FolderKanban, Plus, Sparkles } from "lucide-react";
+import { FolderKanban, LogOut, Plus, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/api-client";
 import type { ProjectRow } from "@/types";
+
+type AuthUser = { userId: string; email: string };
 
 export default function HomePage() {
   const [projects, setProjects] = useState<ProjectRow[]>([]);
@@ -16,6 +18,7 @@ export default function HomePage() {
   const [overviewDraft, setOverviewDraft] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -30,7 +33,16 @@ export default function HomePage() {
 
   useEffect(() => {
     refresh();
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setUser(d))
+      .catch(() => {});
   }, [refresh]);
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,18 +100,36 @@ export default function HomePage() {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setModalOpen(true)}
-            className={cn(
-              "inline-flex items-center gap-2 rounded-lg bg-foreground px-3.5 py-2 text-sm font-medium text-background",
-              "shadow-sm transition hover:bg-foreground/90",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+          <div className="flex items-center gap-3">
+            {user && (
+              <>
+                <span className="hidden text-xs text-muted-foreground sm:block">
+                  {user.email}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  title="로그아웃"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-muted-foreground transition hover:border-white/20 hover:text-foreground"
+                >
+                  <LogOut className="size-3.5" />
+                  로그아웃
+                </button>
+              </>
             )}
-          >
-            <Plus className="size-4" />
-            New Project
-          </button>
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-lg bg-foreground px-3.5 py-2 text-sm font-medium text-background",
+                "shadow-sm transition hover:bg-foreground/90",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+              )}
+            >
+              <Plus className="size-4" />
+              New Project
+            </button>
+          </div>
         </div>
       </header>
 

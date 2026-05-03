@@ -2,18 +2,79 @@
 
 - **Framework:** Next.js App Router (`app/api/...`), TypeScript
 - **ORM:** Drizzle ORM + `@neondatabase/serverless` (Neon HTTP 드라이버)
-- **인증:** 현재 미구현 — 모든 API는 인증 없이 동작 (`DEV_USER_ID` 고정 사용). Neon Auth Bearer 토큰 검증은 추후 적용 예정.
+- **인증:** 이메일/비밀번호 자체 인증 구현 완료. `fp-session` HTTP-only 쿠키(7일 만료 JWT)로 세션 관리. `middleware.ts`가 `/login`, `/signup`, `/api/auth/*` 제외 모든 라우트를 보호. 미인증 페이지 요청 → `/login` 리다이렉트, 미인증 API 요청 → `401` 반환.
 - **공통 에러 응답 형식:** `{ "error": "메시지" }`
 
 ## 2. API 엔드포인트 상세
 
+### 2.0 인증 (Auth)
+
+> 아래 4개 엔드포인트는 미들웨어 보호 **제외** — 미인증 상태에서도 호출 가능.
+
+---
+
+**`POST /api/auth/signup`**
+
+- **기능:** 이메일/비밀번호로 회원가입. bcrypt(rounds=12) 해시 후 `users` 테이블에 insert. 성공 시 JWT를 `fp-session` HTTP-only 쿠키로 발급.
+- **Request Body:**
+
+```json
+{
+  "email": "string (required)",
+  "password": "string (required, 8자 이상)"
+}
+```
+
+- **Response (201 Created):** `{ "userId": "uuid", "email": "string" }` + `Set-Cookie: fp-session`
+- **Error (400):** 이메일/비밀번호 누락, 비밀번호 8자 미만
+- **Error (409):** 이미 사용 중인 이메일
+- **Error (500):** DB 오류
+
+---
+
+**`POST /api/auth/login`**
+
+- **기능:** 이메일/비밀번호 로그인. DB에서 사용자 조회 후 `bcrypt.compare`로 검증. 성공 시 JWT를 `fp-session` HTTP-only 쿠키로 발급.
+- **Request Body:**
+
+```json
+{
+  "email": "string (required)",
+  "password": "string (required)"
+}
+```
+
+- **Response (200 OK):** `{ "userId": "uuid", "email": "string" }` + `Set-Cookie: fp-session`
+- **Error (400):** 이메일/비밀번호 누락
+- **Error (401):** 이메일 없음 또는 비밀번호 불일치 (보안을 위해 동일 메시지 반환)
+- **Error (500):** DB 오류
+
+---
+
+**`POST /api/auth/logout`**
+
+- **기능:** `fp-session` 쿠키를 만료시켜 로그아웃 처리.
+- **Request Body:** 없음
+- **Response (200 OK):** `{ "ok": true }` + `Set-Cookie: fp-session=; maxAge=0`
+
+---
+
+**`GET /api/auth/me`**
+
+- **기능:** 현재 유효한 세션의 사용자 정보 반환. 미인증 시 `null` 반환 (401 아님 — 클라이언트 초기화용).
+- **Response (200 OK):** `{ "userId": "uuid", "email": "string" }` 또는 `null`
+
+---
+
 ### 2.1 프로젝트 관리
+
+> 아래 모든 엔드포인트는 미들웨어에 의해 인증 필수. 세션 없으면 `401` 반환.
 
 ---
 
 **`GET /api/projects`**
 
-- **기능:** 전체 프로젝트 목록 조회 (생성일 역순 정렬)
+- **기능:** 로그인한 사용자의 프로젝트 목록 조회 (생성일 역순 정렬). `session.userId`로 필터링.
 - **Response (200 OK):** `ProjectRow[]`
 
 ```json
@@ -30,13 +91,14 @@
 ]
 ```
 
+- **Error (401):** 세션 없음
 - **Error (500):** DB 조회 실패
 
 ---
 
 **`POST /api/projects`**
 
-- **기능:** 신규 프로젝트 생성. `DEV_USER_ID` 유저를 upsert한 뒤 프로젝트 insert. 생성 시 `documents` 테이블에 `00_overview`, `01_db_schema`, `02_api_routes`, `03_frontend_ui` 4개 row를 자동 시딩.
+- **기능:** 신규 프로젝트 생성. `session.userId`를 `user_id`로 사용. 생성 시 `documents` 테이블에 `00_overview`, `01_db_schema`, `02_api_routes`, `03_frontend_ui` 4개 row를 자동 시딩.
 - **Request Body:**
 
 ```json
@@ -49,6 +111,7 @@
 
 - **Response (201 Created):** `ProjectRow`
 - **Error (400):** `name` 누락
+- **Error (401):** 세션 없음
 - **Error (500):** DB 오류
 
 ---
@@ -303,7 +366,8 @@
 | 코드 | 의미 | 현재 구현 여부 |
 |------|------|--------------|
 | `400 Bad Request` | 필수 파라미터 누락 또는 SQL 실행 실패 | ✅ 구현됨 |
-| `401 Unauthorized` | 유효하지 않은 세션/토큰 | ❌ 미구현 (Auth 연동 후 적용 예정) |
+| `401 Unauthorized` | 미인증 요청 (세션 쿠키 없음 또는 JWT 만료/변조) | ✅ 구현됨 (`middleware.ts` + 각 API 핸들러 내 `getSession()` 체크) |
 | `403 Forbidden` | Workflow Locking 위반 | ❌ 미구현 (클라이언트 측 가드로만 처리) |
 | `404 Not Found` | 리소스 없음 | ✅ 구현됨 (projects, documents) |
+| `409 Conflict` | 중복 리소스 (이메일 중복 등) | ✅ 구현됨 (signup 이메일 중복) |
 | `500 Internal Server Error` | DB 통신 실패 또는 외부 API 오류 | ✅ 구현됨 |

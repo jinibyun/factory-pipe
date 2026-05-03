@@ -5,13 +5,18 @@
 - **State Management:** React Context API — `WorkflowContext` (`contexts/workflow-context.tsx`)
 - **아이콘:** `lucide-react`, `@radix-ui/react-icons`
 - **디자인 컨셉:** Vercel 대시보드 스타일의 B2B SaaS 레이아웃. 배경 그리드 패턴 + 방사형 그래디언트 오버레이.
+- **인증:** 이메일/비밀번호 자체 인증 구현 완료. `middleware.ts`가 Next.js Edge에서 라우트를 보호. `jose` JWT + HTTP-only 쿠키 기반 세션.
 
 ## 2. 라우팅 구조 (Route Tree)
 
 ```
 app/
-├── page.tsx                          → / (프로젝트 목록 홈)
+├── page.tsx                          → / (프로젝트 목록 홈, 인증 필요)
 ├── layout.tsx                        → 루트 레이아웃 (html, body, Geist 폰트)
+├── login/
+│   └── page.tsx                      → /login (로그인 페이지, 공개)
+├── signup/
+│   └── page.tsx                      → /signup (회원가입 페이지, 공개)
 └── project/
     └── [id]/
         ├── page.tsx                  → /project/[id] → /project/[id]/phase/1 리다이렉트
@@ -21,7 +26,15 @@ app/
             ├── 2/page.tsx            → Phase 2: 명세서 분할 및 Lock
             ├── 3/page.tsx            → Phase 3: 프롬프트 인젝터
             └── 4/page.tsx            → Phase 4: 마이그레이션 모니터
+
+middleware.ts                         → Edge 미들웨어: /login, /signup, /api/auth/* 제외 전체 보호
 ```
+
+### 미들웨어 보호 규칙 (`middleware.ts`)
+
+- **제외 경로**: `_next/static`, `_next/image`, `favicon.ico`, `/login`, `/signup`, `/api/auth/*`
+- **페이지 요청** (미인증): `/login`으로 리다이렉트 + 만료된 쿠키 삭제
+- **API 요청** (미인증): `{ "error": "Unauthorized" }` + 401 반환
 
 ## 3. 공통 레이아웃 (Layout Structure)
 
@@ -92,12 +105,36 @@ phase === currentPhase → "current"
 
 ## 5. 핵심 화면 상세
 
-### 5.1 홈 — 프로젝트 목록 (`app/page.tsx`)
+### 5.1 로그인 (`app/login/page.tsx`)
 
-- **Client Component**
-- **API 호출:** `GET /api/projects` (마운트 시)
+- **Client Component**, 공개 접근 가능 (미들웨어 제외)
 - **UI 요소:**
-  - 헤더: `Sparkles` 아이콘 + "Factory Pipe" 로고 + `[New Project]` 버튼
+  - 중앙 정렬 카드 (`rounded-xl border border-white/10 bg-card/50 backdrop-blur-sm`)
+  - 상단: `Sparkles` 아이콘 + "Factory Pipe" 로고
+  - 이메일, 비밀번호 입력 필드
+  - `[로그인]` 버튼 → `POST /api/auth/login` 호출 → 성공 시 `/`로 이동
+  - 에러 메시지 인라인 표시 (`bg-destructive/10`)
+  - 하단: "계정이 없으신가요? 회원가입" 링크 → `/signup`
+
+### 5.2 회원가입 (`app/signup/page.tsx`)
+
+- **Client Component**, 공개 접근 가능 (미들웨어 제외)
+- **UI 요소:**
+  - 로그인 페이지와 동일 카드 레이아웃
+  - 이메일, 비밀번호, 비밀번호 확인 입력 필드 (비밀번호 최소 8자)
+  - 클라이언트 측 비밀번호 불일치 검증
+  - `[회원가입]` 버튼 → `POST /api/auth/signup` 호출 → 성공 시 `/`로 이동
+  - 하단: "이미 계정이 있으신가요? 로그인" 링크 → `/login`
+
+### 5.3 홈 — 프로젝트 목록 (`app/page.tsx`)
+
+- **Client Component**, 인증 필수 (미들웨어가 미인증 시 `/login`으로 리다이렉트)
+- **API 호출:**
+  - 마운트 시: `GET /api/projects` + `GET /api/auth/me` (병렬)
+- **UI 요소:**
+  - 헤더: `Sparkles` 아이콘 + "Factory Pipe" 로고
+  - 헤더 우측: 로그인 사용자 이메일 + `[로그아웃]` 버튼 (`LogOut` 아이콘) + `[New Project]` 버튼
+  - 로그아웃: `POST /api/auth/logout` 호출 → `window.location.href = "/login"`
   - 프로젝트 카드 그리드 (`sm:grid-cols-2`): 이름, 설명, 생성일 표시
   - 프로젝트 없을 시 빈 상태 안내 + `[프로젝트 만들기]` 버튼
   - **New Project 모달** (`role="dialog"`, `aria-modal`):
@@ -105,7 +142,7 @@ phase === currentPhase → "current"
     - `00_overview.md` 초안 textarea (monospace, resize-y)
     - 생성 완료 시 `/project/{id}/phase/1`으로 이동
 
-### 5.2 Phase 1 — 요구사항 입력 (`app/project/[id]/phase/1/page.tsx`)
+### 5.4 Phase 1 — 요구사항 입력 (`app/project/[id]/phase/1/page.tsx`)
 
 - **Client Component**, 접근 제한 없음 (Phase 1은 항상 접근 가능)
 - **API 호출:**
@@ -117,7 +154,7 @@ phase === currentPhase → "current"
   - `[Phase 1 확정 (Final)]` 버튼 → `save()` 후 `lockPhase(1)` 호출 → Phase 2 잠금 해제
   - 확정 후 버튼 텍스트 "Phase 1 확정됨"으로 변경 + disabled
 
-### 5.3 Phase 2 — 명세서 분할 및 Lock (`app/project/[id]/phase/2/page.tsx`)
+### 5.5 Phase 2 — 명세서 분할 및 Lock (`app/project/[id]/phase/2/page.tsx`)
 
 - **Client Component**, `<PhaseAccessGuard phase={2} />`로 접근 제어
 - **API 호출:**
@@ -133,7 +170,7 @@ phase === currentPhase → "current"
   - 편집 가능 textarea (monospace, resize-y, rows=22)
   - 상태 메시지 (4초 후 자동 사라짐)
 
-### 5.4 Phase 3 — 프롬프트 인젝터 (`app/project/[id]/phase/3/page.tsx`)
+### 5.6 Phase 3 — 프롬프트 인젝터 (`app/project/[id]/phase/3/page.tsx`)
 
 - **Client Component**, `<PhaseAccessGuard phase={3} />`로 접근 제어
 - **API 호출:** `target` 변경 또는 마운트 시 `POST /api/prompts/assemble` 자동 실행
@@ -143,7 +180,7 @@ phase === currentPhase → "current"
   - `[완료 → Phase 4 잠금 해제]` 버튼 → confirm 후 `lockPhase(3)` 호출 → Phase 4 잠금 해제. 완료 후 "Phase 4 잠금 해제됨 ✓" + disabled
   - 읽기 전용 textarea (monospace, rows=24, bg-muted/30)
 
-### 5.5 Phase 4 — 마이그레이션 모니터 (`app/project/[id]/phase/4/page.tsx`)
+### 5.7 Phase 4 — 마이그레이션 모니터 (`app/project/[id]/phase/4/page.tsx`)
 
 - **Client Component**, `<PhaseAccessGuard phase={4} />`로 접근 제어
 - **API 호출:**
@@ -166,6 +203,7 @@ phase === currentPhase → "current"
 - **다크 모드:** `<html className="dark">` 전역 적용, CSS 변수(`--background`, `--foreground` 등) 기반
 - **Tailwind 주요 패턴:**
   - 카드: `rounded-2xl border border-white/10 bg-card/50`
+  - 인증 카드: `rounded-xl border border-white/10 bg-card/50 backdrop-blur-sm`
   - 주요 버튼: `bg-primary text-primary-foreground rounded-md hover:bg-primary/90`
   - 보조 버튼: `border border-border rounded-md hover:bg-accent/30`
   - 비활성: `disabled:pointer-events-none disabled:opacity-40`

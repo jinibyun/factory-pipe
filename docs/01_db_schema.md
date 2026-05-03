@@ -3,19 +3,20 @@
 - **Database**: Neon (PostgreSQL 17, `aws-us-east-1`)
 - **ORM**: Drizzle ORM (`drizzle-orm` + `drizzle-orm/neon-http`)
 - **드라이버**: `@neondatabase/serverless` (HTTP 기반 서버리스 드라이버)
-- **인증**: 현재 미구현 — 임시 고정 사용자 `DEV_USER_ID = "00000000-0000-0000-0000-000000000001"` 사용 (Neon Auth 연동 예정)
+- **인증**: 이메일/비밀번호 기반 자체 인증 구현 완료 (`jose` JWT + `bcryptjs` 비밀번호 해시). `fp-session` HTTP-only 쿠키로 세션 관리. 이전에 사용하던 `DEV_USER_ID` 플레이스홀더 완전 제거.
 - **원칙**: 모든 테이블은 RLS(Row Level Security) 활성화 예정. 현재는 미적용 상태.
 
 ## 2. 테이블 설계 (Tables & Relationships)
 
 ### 2.1 `users` (사용자 프로필)
 
-현재는 Auth 연동 전 단계로, API 호출 시 `ON CONFLICT DO NOTHING` 방식으로 `DEV_USER_ID`를 자동 삽입한다.
+회원가입(`POST /api/auth/signup`) 시 `bcrypt(12)` 해시된 비밀번호와 함께 row가 생성됨.
 
 | 컬럼 | 타입 | 제약 | 기본값 | 비고 |
 |------|------|------|--------|------|
 | `id` | uuid | PK, NOT NULL | `gen_random_uuid()` | |
-| `email` | text | NOT NULL, UNIQUE | — | |
+| `email` | text | NOT NULL, UNIQUE | — | 로그인 식별자 |
+| `password_hash` | text | nullable | — | bcrypt 해시 (rounds=12). OAuth 등 외부 인증 시 NULL 허용 예정 |
 | `github_username` | text | nullable | — | GitHub 연동 시 저장 |
 | `created_at` | timestamptz | NOT NULL | `now()` | |
 
@@ -100,7 +101,7 @@ prompts  (독립 테이블 — FK 없음)
 
 ## 4. RLS (Row Level Security) 정책
 
-> **현재 미적용 상태.** Auth 구현 후 아래 패턴으로 적용 예정.
+> **현재 미적용 상태.** Auth 구현 완료 후 아래 패턴으로 적용 예정.
 
 `prompts` (시스템 공통) 테이블을 제외한 모든 테이블에 소유자 기반 정책 적용 계획:
 

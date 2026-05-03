@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { users, projects, documents } from "@/lib/schema";
-import { desc } from "drizzle-orm";
+import { projects, documents } from "@/lib/schema";
+import { eq, desc } from "drizzle-orm";
 import { DEFAULT_SPECS } from "@/lib/spec-defaults";
+import { getSession } from "@/lib/session";
 import type { CreateProjectRequest, ProjectRow } from "@/types";
-
-// Placeholder user until Neon Auth is wired up
-const DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
 
 function toIso(v: Date | string): string {
   return v instanceof Date ? v.toISOString() : String(v);
@@ -26,9 +24,15 @@ function toProjectRow(p: typeof projects.$inferSelect): ProjectRow {
 
 export async function GET() {
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const rows = await db
       .select()
       .from(projects)
+      .where(eq(projects.userId, session.userId))
       .orderBy(desc(projects.createdAt));
     return NextResponse.json(rows.map(toProjectRow));
   } catch (err) {
@@ -39,21 +43,20 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = (await req.json()) as CreateProjectRequest;
     if (!body.name?.trim()) {
       return NextResponse.json({ error: "name is required" }, { status: 400 });
     }
 
-    // Ensure dev user exists (replaced by real auth later)
-    await db
-      .insert(users)
-      .values({ id: DEV_USER_ID, email: "dev@factory-pipe.local" })
-      .onConflictDoNothing();
-
     const [project] = await db
       .insert(projects)
       .values({
-        userId: DEV_USER_ID,
+        userId: session.userId,
         name: body.name.trim(),
         description: body.description?.trim() ?? null,
         status: "active",
