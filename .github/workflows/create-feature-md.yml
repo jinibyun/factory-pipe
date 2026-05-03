@@ -1,0 +1,53 @@
+name: Create Feature MD from Issue
+
+on:
+  issues:
+    types: [opened] # 이슈가 새로 열릴 때만 동작하도록 엄격히 통제함
+
+permissions:
+  contents: write # 봇이 코드를 커밋하고 푸시할 수 있는 쓰기 권한
+  issues: read    # 이슈 내용을 읽어올 수 있는 읽기 권한
+
+jobs:
+  create-feature-md:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate MD File Name and Structure
+        run: |
+          # 1. 이슈 번호와 제목 추출
+          ISSUE_NUMBER=${{ github.event.issue.number }}
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+          
+          # 2. 파일명 정제 (특수문자 제거, 띄어쓰기를 하이픈으로 변경, 소문자 변환)
+          # 예: "Auth 로그인 기능 추가" -> feature_12_auth-------.md 형태로 변환됨
+          SAFE_TITLE=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | sed -e 's/[^a-zA-Z0-9가-힣]/-/g' -e 's/-\{2,\}/-/g' -e 's/^-//' -e 's/-$//')
+          FILENAME="docs/features/feature_${ISSUE_NUMBER}_${SAFE_TITLE}.md"
+          
+          # 3. 폴더가 존재하지 않으면 강제 생성
+          mkdir -p docs/features
+          
+          # 4. Feature MD 표준 템플릿 주입
+          echo "# [Feature #${ISSUE_NUMBER}] ${ISSUE_TITLE}" > "$FILENAME"
+          echo "" >> "$FILENAME"
+          echo "## 1. 요구사항 명세 (Issue Content)" >> "$FILENAME"
+          echo "${{ github.event.issue.body }}" >> "$FILENAME"
+          echo "" >> "$FILENAME"
+          echo "## 2. 참조 마스터 문서" >> "$FILENAME"
+          echo "- @01_db_schema.md" >> "$FILENAME"
+          echo "- @02_api_routes.md" >> "$FILENAME"
+          echo "- @03_frontend_ui.md" >> "$FILENAME"
+          echo "" >> "$FILENAME"
+          echo "## 3. 반영된 최종 스펙 (AI 작업 결과물)" >> "$FILENAME"
+          echo "<!-- Cursor AI가 코드 작업을 완료한 후, 변경된 스펙(DB/API/UI)을 여기에 요약 기록합니다. 마스터 문서 수정은 별도의 동기화 프로세스를 따릅니다. -->" >> "$FILENAME"
+          
+      - name: Commit and Push to Repository
+        run: |
+          # GitHub Actions 봇의 계정으로 자동 커밋 수행
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/features/*
+          git commit -m "docs: auto-generate feature MD for issue #${{ github.event.issue.number }}"
+          git push
