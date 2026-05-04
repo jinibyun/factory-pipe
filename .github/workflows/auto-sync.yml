@@ -1,0 +1,46 @@
+name: Auto Reverse-Sync (API & UI)
+
+on:
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  auto-update-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Extract Git Diff (Exclude DB)
+        run: |
+          # DB 스키마 관련 파일을 제외한 프론트/API 코드 변경점만 추출
+          git diff origin/main HEAD -- 'app/**' 'components/**' 'pages/**' 'api/**' > diff.txt
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Run LLM Reverse-Sync Script
+        env:
+          # Vercel 환경 변수가 아닌 GitHub Secrets에 등록할 LLM API 키
+          AI_API_KEY: ${{ secrets.AI_API_KEY }} 
+        run: |
+          node scripts/auto-sync-md.js
+
+      - name: Commit and Push Updated MD
+        run: |
+          git config --global user.name "Factory Auto-Sync Bot"
+          git config --global user.email "bot@factory.local"
+          git add 02_api_routes.md 03_frontend_ui.md
+          
+          # 변경사항이 있을 때만 커밋
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "docs: Auto reverse-sync 02 and 03 specs based on latest commit"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          else
+            echo "문서 변경 사항 없음"
+          fi
