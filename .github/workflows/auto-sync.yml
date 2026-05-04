@@ -17,7 +17,7 @@ jobs:
       - name: Extract Git Diff (Exclude DB)
         run: |
           # DB 스키마 관련 파일을 제외한 프론트/API 코드 변경점만 추출
-          git diff origin/main HEAD -- 'app/**' 'components/**' 'pages/**' 'api/**' > diff.txt
+          git diff origin/master HEAD -- 'app/**' 'components/**' 'pages/**' 'api/**' > diff.txt
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
