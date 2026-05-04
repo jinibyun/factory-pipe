@@ -3,8 +3,8 @@ const path = require('path');
 
 // 파일 경로 설정
 const diffPath = path.join(__dirname, '../diff.txt');
-const apiDocsPath = path.join(__dirname, '../02_api_routes.md');
-const uiDocsPath = path.join(__dirname, '../03_frontend_ui.md');
+const apiDocsPath = path.join(__dirname, '../docs/02_api_routes.md');
+const uiDocsPath = path.join(__dirname, '../docs/03_frontend_ui.md');
 
 async function runAutoSync() {
   try {

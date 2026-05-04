@@ -35,9 +35,11 @@ jobs:
         run: |
           git config --global user.name "Factory Auto-Sync Bot"
           git config --global user.email "bot@factory.local"
-          git add 02_api_routes.md 03_frontend_ui.md
           
-          # 변경사항이 있을 때만 커밋
+          # 경로를 docs/ 로 변경
+          [ -f docs/02_api_routes.md ] && git add docs/02_api_routes.md || true
+          [ -f docs/03_frontend_ui.md ] && git add docs/03_frontend_ui.md || true
+          
           if ! git diff-index --quiet HEAD; then
             git commit -m "docs: Auto reverse-sync 02 and 03 specs based on latest commit"
             git push origin HEAD:${{ github.event.pull_request.head.ref }}
