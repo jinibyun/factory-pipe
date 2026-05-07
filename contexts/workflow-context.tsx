@@ -27,7 +27,7 @@ type WorkflowContextValue = {
   /** Sidebar: completed | current | locked | idle */
   getPhaseStatus: (
     phase: 1 | 2 | 3 | 4,
-    currentPhase: number,
+    currentPhase: number
   ) => "completed" | "current" | "locked" | "idle";
 };
 
@@ -43,7 +43,8 @@ function loadLocksFromStorage(projectId: string): PhaseLocks {
   }
   try {
     const raw = localStorage.getItem(lsKey(projectId));
-    if (!raw) return { phase1: false, phase2: false, phase3: false, phase4: false };
+    if (!raw)
+      return { phase1: false, phase2: false, phase3: false, phase4: false };
     const p = JSON.parse(raw) as Partial<PhaseLocks>;
     return {
       phase1: Boolean(p.phase1),
@@ -65,12 +66,13 @@ function saveLocksToStorage(projectId: string, locks: PhaseLocks) {
 }
 
 /** Derive PhaseLocks from the status of the three spec documents. */
-function deriveLocks(documents: { doc_type: string; status: string }[]): PhaseLocks {
+function deriveLocks(
+  documents: { doc_type: string; status: string }[]
+): PhaseLocks {
   const isFinal = (type: string) =>
     documents.find((d) => d.doc_type === type)?.status === "Final";
 
-  // Phase 1 locked = requirements saved (we check for 00_overview or just use requirements endpoint result)
-  // For now: phase2 lock comes from all 3 spec docs being Final.
+  // Phase 2 lock comes from all 3 spec docs being Final.
   const specsFinal =
     isFinal("01_db_schema") &&
     isFinal("02_api_routes") &&
@@ -108,24 +110,29 @@ export function WorkflowProvider({
   // Sync with API: load document statuses and update locks
   useEffect(() => {
     let cancelled = false;
-    apiClient.getDocuments(projectId).then((docs) => {
-      if (cancelled) return;
-      const apiLocks = deriveLocks(docs);
-      // Merge: keep any local locks that are already true (ratchet-only forward)
-      setLocksState((prev) => {
-        const merged: PhaseLocks = {
-          phase1: prev.phase1 || apiLocks.phase1,
-          phase2: prev.phase2 || apiLocks.phase2,
-          phase3: prev.phase3 || apiLocks.phase3,
-          phase4: prev.phase4 || apiLocks.phase4,
-        };
-        saveLocksToStorage(projectId, merged);
-        return merged;
+    apiClient
+      .getDocuments(projectId)
+      .then((docs) => {
+        if (cancelled) return;
+        const apiLocks = deriveLocks(docs);
+        // Merge: keep any local locks that are already true (ratchet-only forward)
+        setLocksState((prev) => {
+          const merged: PhaseLocks = {
+            phase1: prev.phase1 || apiLocks.phase1,
+            phase2: prev.phase2 || apiLocks.phase2,
+            phase3: prev.phase3 || apiLocks.phase3,
+            phase4: prev.phase4 || apiLocks.phase4,
+          };
+          saveLocksToStorage(projectId, merged);
+          return merged;
+        });
+      })
+      .catch(() => {
+        // API not reachable — fall back to localStorage state silently
       });
-    }).catch(() => {
-      // API not reachable — fall back to localStorage state silently
-    });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [projectId]);
 
   const setLocks = useCallback(
@@ -133,7 +140,7 @@ export function WorkflowProvider({
       setLocksState(next);
       saveLocksToStorage(projectId, next);
     },
-    [projectId],
+    [projectId]
   );
 
   const lockPhase = useCallback(
@@ -150,7 +157,7 @@ export function WorkflowProvider({
         return next;
       });
     },
-    [projectId],
+    [projectId]
   );
 
   const canAccessPhase = useCallback(
@@ -160,7 +167,7 @@ export function WorkflowProvider({
       if (phase === 3) return locks.phase2;
       return locks.phase3;
     },
-    [locks],
+    [locks]
   );
 
   const getPhaseStatus = useCallback(
@@ -180,7 +187,7 @@ export function WorkflowProvider({
       if (done) return "completed";
       return "idle";
     },
-    [locks],
+    [locks]
   );
 
   const value = useMemo(
@@ -192,11 +199,13 @@ export function WorkflowProvider({
       canAccessPhase,
       getPhaseStatus,
     }),
-    [projectId, locks, setLocks, lockPhase, canAccessPhase, getPhaseStatus],
+    [projectId, locks, setLocks, lockPhase, canAccessPhase, getPhaseStatus]
   );
 
   return (
-    <WorkflowContext.Provider value={value}>{children}</WorkflowContext.Provider>
+    <WorkflowContext.Provider value={value}>
+      {children}
+    </WorkflowContext.Provider>
   );
 }
 

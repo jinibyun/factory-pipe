@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Check, Lock } from "lucide-react";
+import { Check, Lock, Home, ChevronLeft } from "lucide-react";
 import { useWorkflow } from "@/contexts/workflow-context";
-import { loadProjects } from "@/lib/projects";
+import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 const PHASES = [
@@ -18,27 +18,32 @@ const PHASES = [
 export function PhaseNavigator({ projectId }: { projectId: string }) {
   const pathname = usePathname();
   const { getPhaseStatus, canAccessPhase } = useWorkflow();
-  const [title, setTitle] = useState(projectId);
+  const [title, setTitle] = useState<string>("...");
 
   useEffect(() => {
-    const p = loadProjects().find((x) => x.id === projectId);
-    if (p?.name) setTitle(p.name);
+    apiClient
+      .getProject(projectId)
+      .then((p) => setTitle(p.name))
+      .catch(() => setTitle(projectId));
   }, [projectId]);
 
   const match = pathname.match(/\/phase\/(\d+)/);
   const currentPhase = match ? Number(match[1]) : 1;
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-card/30">
-      <div className="border-b border-border px-4 py-4">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+    <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-card/20 backdrop-blur-sm">
+      {/* Project Header */}
+      <div className="border-b border-border px-4 py-5">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
           Workflow
         </p>
-        <p className="mt-1 truncate text-sm font-semibold text-foreground">
+        <p className="mt-2 truncate text-sm font-semibold text-foreground">
           {title}
         </p>
       </div>
-      <nav className="flex flex-1 flex-col gap-0.5 p-2">
+
+      {/* Phase Navigation */}
+      <nav className="flex flex-1 flex-col gap-1 p-3">
         {PHASES.map(({ n, label, sub }) => {
           const status = getPhaseStatus(n, currentPhase);
           const href = `/project/${projectId}/phase/${n}`;
@@ -46,17 +51,19 @@ export function PhaseNavigator({ projectId }: { projectId: string }) {
 
           const icon =
             status === "locked" || blocked ? (
-              <Lock className="size-4 shrink-0 text-muted-foreground" />
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted/50">
+                <Lock className="size-3.5 text-muted-foreground" />
+              </span>
             ) : status === "completed" ? (
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary">
-                <Check className="size-3.5" strokeWidth={2.5} />
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
+                <Check className="size-4" strokeWidth={2.5} />
               </span>
             ) : status === "current" ? (
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full border-2 border-primary bg-primary/10 text-xs font-semibold text-primary">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full border-2 border-foreground bg-foreground/10 text-xs font-bold text-foreground">
                 {n}
               </span>
             ) : (
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-border text-xs text-muted-foreground">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border text-xs text-muted-foreground">
                 {n}
               </span>
             );
@@ -64,19 +71,30 @@ export function PhaseNavigator({ projectId }: { projectId: string }) {
           const content = (
             <div
               className={cn(
-                "flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors",
-                status === "current" && "bg-accent/50",
+                "flex items-center gap-3 rounded-xl px-3 py-3 transition-all",
+                status === "current" && "bg-white/5 shadow-sm",
                 (status === "locked" || blocked) &&
-                  "cursor-not-allowed opacity-60",
-                !(status === "locked" || blocked) && "hover:bg-accent/30",
+                  "cursor-not-allowed opacity-50",
+                !(status === "locked" || blocked) &&
+                  status !== "current" &&
+                  "hover:bg-white/5"
               )}
             >
               {icon}
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium leading-tight text-foreground">
-                  Phase {n}: {label}
+                <p
+                  className={cn(
+                    "text-sm font-medium leading-tight",
+                    status === "current"
+                      ? "text-foreground"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  Phase {n}
                 </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>
+                <p className="mt-0.5 truncate text-[11px] text-muted-foreground/70">
+                  {sub}
+                </p>
               </div>
             </div>
           );
@@ -96,18 +114,25 @@ export function PhaseNavigator({ projectId }: { projectId: string }) {
           }
 
           return (
-            <Link key={n} href={href} className="block rounded-lg outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring">
+            <Link
+              key={n}
+              href={href}
+              className="block rounded-xl outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+            >
               {content}
             </Link>
           );
         })}
       </nav>
+
+      {/* Footer */}
       <div className="border-t border-border p-3">
         <Link
           href="/"
-          className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+          className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
         >
-          ← 모든 프로젝트
+          <ChevronLeft className="size-3.5" />
+          모든 프로젝트
         </Link>
       </div>
     </aside>

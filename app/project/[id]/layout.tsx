@@ -12,9 +12,24 @@ export default async function ProjectLayout({
 
   return (
     <WorkflowProvider projectId={id}>
-      <div className="flex min-h-screen">
+      <div className="relative flex min-h-screen">
+        {/* Background effects */}
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 bg-radial-gradient"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 bg-grid-pattern"
+        />
+        
+        {/* Sidebar */}
         <PhaseNavigator projectId={id} />
-        <div className="flex min-h-screen flex-1 flex-col">{children}</div>
+        
+        {/* Main content */}
+        <div className="relative flex min-h-screen flex-1 flex-col">
+          {children}
+        </div>
       </div>
     </WorkflowProvider>
   );
